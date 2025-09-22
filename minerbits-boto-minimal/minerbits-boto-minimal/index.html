@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MinerBits — Boto (Minimal)</title>
+    <link rel="stylesheet" href="./src/styles.css">
+    <link rel="stylesheet" href="./src/animations/boto.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel">
+        <h2>Animações (Boto)</h2>
+        <div class="btns">
+          <button data-action="tap" class="btn" title="2">tap</button>
+          <button data-action="wave" class="btn" title="3">wave</button>
+          <button data-action="success" class="btn" title="4">success</button>
+          <button data-action="error" class="btn" title="5">error</button>
+          <button data-action="loading" class="btn" title="6">loading</button>
+          <button data-action="idle" class="btn" title="1">idle</button>
+        </div>
+        <p class="legend">Atalhos 1–6. Spritesheet carregado de <code>src/sprites/boto.png</code> —
+        1 linha por ação, 64×64 por frame.</p>
+      </section>
+
+      <section class="stage">
+        <div class="pet" aria-label="Boto cor-de-rosa" role="img"></div>
+      </section>
+    </main>
+
+    <script src="./src/main.js" type="module"></script>
+  </body>
+</html>
