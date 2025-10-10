@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MinerBits — Boto</title>
+
+  <style>
+    :root{
+      --tile: 64px;                 /* tamanho de cada frame (64x64) */
+      --frames: 4;                  /* frames do estado ativo (o JS atualiza) */
+      --fps: 12;                    /* taxa base (o JS ajusta por estado) */
+      --row: 0;                     /* linha atual no spritesheet */
+      --sheet: url('sprites/boto.png'); /* ← spritesheet (1 linha por estado) */
+    }
+
+    /* Palquinho simples só pra ver bonito (opcional) */
+    html,body{height:100%}
+    body{
+      margin:0; display:grid; place-items:center;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
+      background: radial-gradient(1200px 600px at 30% -10%, #192a56 0%, #0b1220 60%);
+      color:#e6eef8;
+    }
+
+    /* O sprite em si */
+    .pet{
+      width: var(--tile);
+      height: var(--tile);
+      image-rendering: pixelated;      /* mantém o pixel art nítido */
+      background-image: var(--sheet);
+      background-repeat: no-repeat;
+      background-size: auto var(--tile);   /* altura da imagem = 1 tile */
+      background-position: 0 calc(var(--row) * (var(--tile) * -1));
+      filter: drop-shadow(0 2px 0 #0008) drop-shadow(0 6px 16px #0007);
+    }
+
+    /* Animação com steps (var(--frames)) movendo o background no eixo X */
+    @keyframes run {
+      from { background-position-x: 0; }
+      to   { background-position-x: calc((var(--frames) - 1) * var(--tile) * -1); }
+    }
+    .run{
+      animation-name: run;
+      animation-timing-function: steps(var(--frames));
+      animation-fill-mode: forwards;
+    }
+    @media (prefers-reduced-motion: reduce){ .run{ animation: none !important; } }
+
+    /* Controles de teste (pode remover no app final) */
+    .panel{margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .panel button{
+      background:#16233f;border:1px solid #263556;color:#e6eef8;
+      padding:8px 12px;border-radius:12px;cursor:pointer
+    }
+    .panel button:hover{background:#1b2a4e}
+    .wrap{display:grid;place-items:center;gap:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- O BOTO -->
+    <div class="pet" role="img" aria-label="Boto cor-de-rosa"></div>
+
+    <!-- Botões de teste (opcional) -->
+    <div class="panel">
+      <button data-action="tap">Tap</button>
+      <button data-action="wave">Wave</button>
+      <button data-action="success">Success</button>
+      <button data-action="error">Error</button>
+      <button data-action="loading">Loading</button>
+      <button data-action="idle">Idle</button>
+    </div>
+  </div>
+
+  <script>
+   // ---------- RESOLVE E VALIDA O CAMINHO DO SPRITESHEET ----------
+async function pickSheet() {
+  // Tente estas opções em ordem
+  const candidates = [
+    new URL('sprites/boto.png', document.baseURI).href,     // ./sprites/boto.png
+    new URL('./sprites/boto.png', document.baseURI).href,   // relativo explícito
+    new URL('/sprites/boto.png', location.origin).href,     // absoluto da raiz do servidor
+    new URL('boto.png', document.baseURI).href,             // (fallback) mesmo dir do index.html
+  ];
+
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (r.ok) return url;
+    } catch (_) { /* ignora e tenta o próximo */ }
+  }
+  return null;
+}
+
+function showDiag(msg) {
+  let el = document.getElementById('boto-diag');
+  if (!el) {
+    el = Object.assign(document.createElement('div'), { id: 'boto-diag' });
+    el.style.cssText = 'position:fixed;bottom:10px;left:10px;padding:6px 8px;background:#0009;color:#cde;font:12px/1.3 ui-monospace;z-index:9999;border-radius:6px';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+}
+
+const PET = document.querySelector('.pet');
+
+(async () => {
+  const url = await pickSheet();
+  if (!url) {
+    showDiag('❌ Não encontrei sprites/boto.png. Coloque o arquivo e recarregue. Dica: ponha TEMPORARIAMENTE o boto.png ao lado do index.html para testar rápido.');
+    // modo dev visual (placeholder) pra não ficar vazio
+    PET.style.background = 'repeating-linear-gradient(90deg,#0000 0,#0000 31px,#000 32px) 0 0/64px 100%, linear-gradient(#f1a5c9,#b76585)';
+    PET.style.border = '1px dashed #fff3';
+    PET.style.borderRadius = '8px';
+    window.BOTO_SHEET_READY = false;
+    return;
+  }
+
+  // seta a variável CSS com o caminho certo e limpa placeholder
+  document.documentElement.style.setProperty('--sheet', `url("${url}")`);
+  PET.style.background = '';
+  PET.style.border = '';
+  window.BOTO_SHEET_READY = true;
+  showDiag('✅ Spritesheet: ' + url);
+})();
+// ---------- SEU CONTROLADOR (igual antes) ----------
+const STATE_MAP = {
+  idle:    { row: 0, frames: 4, loop: true,  fps: 6  },
+  tap:     { row: 1, frames: 3, loop: false, fps: 18 },
+  wave:    { row: 2, frames: 4, loop: false, fps: 14 },
+  success: { row: 3, frames: 4, loop: false, fps: 14 },
+  error:   { row: 4, frames: 3, loop: false, fps: 12 },
+  loading: { row: 5, frames: 5, loop: true,  fps: 10 },
+};
+
+let playingOnce = false;
+function play(state){
+  // se a imagem ainda não carregou, não tenta animar
+  if (!window.BOTO_SHEET_READY) return;
+
+  const cfg = STATE_MAP[state];
+  if(!cfg) return;
+  const pet = document.querySelector('.pet');
+
+  pet.style.setProperty('--row', cfg.row);
+  pet.style.setProperty('--frames', cfg.frames);
+  const fps = cfg.fps ?? 12;
+  pet.style.animationDuration = `${cfg.frames / fps}s`;
+
+  pet.classList.remove('run'); void pet.offsetWidth; pet.classList.add('run');
+  playingOnce = !cfg.loop;
+  pet.style.animationIterationCount = cfg.loop ? 'infinite' : '1';
+}
+
+document.querySelector('.pet').addEventListener('animationend', () => {
+  if (playingOnce) { playingOnce = false; play('idle'); }
+});
+
+document.querySelectorAll('[data-action]').forEach(b => b.onclick = () => play(b.dataset.action));
+window.addEventListener('keydown', e => {
+  const i = +e.key - 1, K = ['idle','tap','wave','success','error','loading'];
+  if (i >= 0 && i < K.length) play(K[i]);
+});
+
+// tenta iniciar; se a sheet ainda não estiver pronta, o play é ignorado e será possível clicar depois
+play('idle');
+
+  </script>
+</body>
+</html>
