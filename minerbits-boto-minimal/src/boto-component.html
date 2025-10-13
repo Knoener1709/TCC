@@ -1,0 +1,413 @@
+<!-- Pixel-art Boto web component
+     File: minerbits-boto-minimal/src/boto-component.html
+     Usage: <boto-component size="32" state="idle"></boto-component>
+     - size: integer for pixel size in px (default 24)
+     - state: visual state placeholder (idle, tap, wave, success, error, loading)
+     This component draws a 16x16 pixel-art Boto using CSS grid. Colors mirror boto.png palette.
+-->
+<template id="boto-template">
+  <style>
+    :host { display:inline-block; line-height:0; }
+    .frame {
+      display:inline-block;
+      image-rendering: pixelated;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(16, var(--px,24px));
+      grid-template-rows: repeat(16, var(--px,24px));
+      width: calc(var(--px,24px) * 16);
+      height: calc(var(--px,24px) * 16);
+      box-sizing: border-box;
+    }
+    .cell { width:100%; height:100%; }
+
+    /* Palette derived from boto.png (approx) */
+    .c-transparent { background: transparent; }
+    .c-cream { background: #ffc0d9; }   /* light pink */
+    .c-pink { background: #ff77b3; }    /* main pink */
+    .c-dark { background: #8b1b3a; }    /* outline/dark */
+    .c-blue { background: #2e88d9; }    /* float/base */
+    .c-deep { background: #c81f56; }    /* deep shadow */
+    .c-black { background: #2b1b1b; }   /* eye */
+
+    /* small helper to show grid while developing (comment out when not needed) */
+    :host([debug]) .cell { outline: 0px solid rgba(0,0,0,0); }
+
+    /* state modifiers - simple examples (can be expanded) */
+    :host([state="error"]) .grid { filter: hue-rotate(-20deg) saturate(0.9); }
+    :host([state="success"]) .grid { filter: hue-rotate(10deg) saturate(1.1); }
+    :host([state="loading"]) .grid { animation: bob 1s infinite ease-in-out; }
+    @keyframes bob { 0%{transform:translateY(0)}50%{transform:translateY(-4px)}100%{transform:translateY(0)} }
+  </style>
+  <div class="frame">
+    <div class="grid" part="grid"></div>
+  </div>
+</template>
+
+<script>
+  class BotoComponent extends HTMLElement {
+    constructor(){
+      super();
+      const tpl = document.getElementById('boto-template');
+      this._root = this.attachShadow({mode:'open'});
+      this._root.appendChild(tpl.content.cloneNode(true));
+      this.grid = this._root.querySelector('.grid');
+      this.size = parseInt(this.getAttribute('size')) || 24;
+      this.state = this.getAttribute('state') || 'idle';
+      this._updateSize();
+      this._renderPixels();
+    }
+
+    static get observedAttributes(){ return ['size','state','debug']; }
+
+    attributeChangedCallback(name, oldV, newV){
+      if(name==='size'){ this.size = parseInt(newV) || 24; this._updateSize(); }
+      if(name==='state'){ this.state = newV || 'idle'; }
+      if(name==='debug'){ /* toggles via attribute */ }
+    }
+
+    _updateSize(){
+      this.grid.style.setProperty('--px', this.size + 'px');
+    }
+
+    /* Draw the 16x16 sprite using a compact map. Each entry is a row with 16 chars.
+       Legend: . = transparent, A = cream, B = pink, C = dark outline, D = blue, E = deep, X = black
+    */
+    _renderPixels(){
+      // Render the currently active frame (this._currentFrame is 16 strings)
+      const map = { '.':'c-transparent', 'A':'c-cream', 'B':'c-pink', 'C':'c-dark', 'D':'c-blue', 'E':'c-deep', 'X':'c-black' };
+
+      const frame = this._getActiveFrame();
+
+      // clear previous
+      while(this.grid.firstChild) this.grid.removeChild(this.grid.firstChild);
+
+      for(let r=0;r<16;r++){
+        const row = frame[r] || '................';
+        for(let c=0;c<16;c++){
+          const ch = row[c] || '.';
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          const cls = map[ch] || 'c-transparent';
+          cell.classList.add(cls);
+          this.grid.appendChild(cell);
+        }
+      }
+    }
+
+    /* Animation frames per state. Each state is an array of frames; each frame is 16-char rows.
+       The frames below are handcrafted approximations inspired by the spritesheet: idle, tap, wave,
+       success, error, loading. You can refine them further to match perfectly.
+    */
+    _frames(){
+      return {
+        idle: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ],
+          [ // slight mouth blink
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB..X..D",
+            ".....CBBBBB...D.",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ]
+        ],
+
+        tap: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBDBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ],
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "..CCBBBAABBB....",
+            "..CBBBBBBBBB....",
+            "..CBBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ]
+        ],
+
+        wave: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            "......D.DD.....D",
+            ".....D..D......D",
+            "................"
+          ],
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            "........D.D....D",
+            "........D..D...D",
+            "................"
+          ]
+        ],
+
+        success: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ],
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            "......*..*.....D",
+            ".......*.......D",
+            ".......D.D.....D",
+            "................"
+          ]
+        ],
+
+        error: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ],
+          [
+            "................",
+            "................",
+            "....EEEEE.......",
+            ".....E.EE.......",
+            "......E.........",
+            ".....E..........",
+            "....E...........",
+            ".....E..........",
+            "......E.........",
+            ".......E........",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................"
+          ]
+        ],
+
+        loading: [
+          [
+            "................",
+            "......CCC.......",
+            ".....CBBBBB.....",
+            "....CBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBAABBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "...CBBBBBBBB....",
+            "....CBBBBB.....D",
+            ".....CBBBBB....D",
+            "......CCCCC....D",
+            ".......DDD.....D",
+            ".......D.D.....D",
+            ".......D.D.....D",
+            "................"
+          ],
+          [
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            ".......X........",
+            "................",
+            "........X.......",
+            "................",
+            ".......X........",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................"
+          ]
+        ]
+      };
+    }
+
+    _getActiveFrame(){
+      // Determine active frame for current state and progress
+      const all = this._frames();
+      const state = this.state in all ? this.state : 'idle';
+      const frames = all[state];
+      const idx = this._frameIndex % frames.length;
+      return frames[idx];
+    }
+
+    _startAnimation(){
+      // basic animation loop controlling frame timing per state
+      if(this._animRunning) return;
+      this._animRunning = true;
+      this._lastTick = performance.now();
+      this._frameIndex = 0;
+      const tick = (now)=>{
+        if(!this._animRunning) return;
+        const elapsed = now - this._lastTick;
+        const speed = this._frameDurationForState(this.state);
+        if(elapsed >= speed){
+          this._frameIndex++;
+          this._lastTick = now;
+          this._renderPixels();
+        }
+        this._raf = requestAnimationFrame(tick);
+      };
+      this._raf = requestAnimationFrame(tick);
+    }
+
+    _stopAnimation(){
+      this._animRunning = false;
+      if(this._raf) cancelAnimationFrame(this._raf);
+      this._raf = null;
+    }
+
+    _frameDurationForState(state){
+      // ms per frame (tuned for natural feeling)
+      switch(state){
+        case 'idle': return 700; // slow blink
+        case 'tap': return 120;  // quick
+        case 'wave': return 200; // medium
+        case 'success': return 250;
+        case 'error': return 300;
+        case 'loading': return 350;
+        default: return 250;
+      }
+    }
+
+    connectedCallback(){
+      this._frameIndex = 0;
+      this._startAnimation();
+    }
+
+    disconnectedCallback(){
+      this._stopAnimation();
+    }
+
+  }
+
+  customElements.define('boto-component', BotoComponent);
+</script>
+
+<!-- Inline usage fallback for direct opening of this file in browser -->
+<!-- If you open this file directly, it will show an example below -->
+<style> body { font-family: system-ui, Arial; padding: 18px; } .row{display:flex;gap:12px;align-items:center}</style>
+<div style="margin-top:12px">
+  <div class="row">
+    <boto-component size="24" state="idle"></boto-component>
+    <boto-component size="32" state="loading"></boto-component>
+    <boto-component size="20" state="success"></boto-component>
+    <boto-component size="20" state="error" debug></boto-component>
+  </div>
+</div>
