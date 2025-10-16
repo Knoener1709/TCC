@@ -1,104 +1,393 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MinerBits — Boto</title>
-
-  <style>
-    :root{
-      --tile: 64px;                 /* tamanho de cada frame (64x64) */
-      --frames: 4;                  /* frames do estado ativo (o JS atualiza) */
-      --fps: 12;                    /* taxa base (o JS ajusta por estado) */
-      --row: 0;                     /* linha atual no spritesheet */
-      --sheet: url('sprites/boto.png'); /* ← spritesheet (1 linha por estado) */
+<!DOCTYPE html>
+<html lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Boto Interativo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #FF69B4;
+            --background-light: #F0F8FF;
+            --background-dark: #1A202C;
+            --button-light: #FFFFFF;
+            --button-dark: #2D3748;
+            --text-light: #1A202C;
+            --text-dark: #F7FAFC;
+        }
+        .boto-container {
+            position: relative;
+            width: 256px;
+            height: 256px;
+        }
+        .boto-body {
+            position: relative;
+            width: 200px;
+            height: 100px;
+            background-color: #FFC0CB;
+            border-radius: 100px 100px 60px 60px / 70px 70px 110px 110px;
+            margin: auto;
+            top: 50%;
+            transform: translateY(-50%);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+        }
+        .boto-body::before {
+            content: '';
+            position: absolute;
+            width: 120px;
+            height: 70px;
+            background-color: #FFB6C1;
+            border-radius: 50%;
+            right: -55px;
+            top: 25px;
+            transform: rotate(-40deg);
+            z-index: -1;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+        }
+        .boto-body::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 35px;
+            background-color: #FFB6C1;
+            border-radius: 20px 20px 15px 15px / 25px 25px 20px 20px;
+            left: 80px;
+            bottom: -15px;
+            transform: rotate(15deg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .snout {
+            position: absolute;
+            width: 70px;
+            height: 35px;
+            background-color: #FFC0CB;
+            border-radius: 20px 20px 15px 15px / 25px 25px 15px 15px;
+            left: -35px;
+            top: 45px;
+            transform: rotate(-5deg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .eye {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #2c2c2c;
+            border-radius: 50%;
+            top: 35px;
+            left: 55px;
+            box-shadow: 0 0 0 2px #fff;
+        }
+        .eye::after {
+            content: '';
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+        }
+        .mouth {
+            position: absolute;
+            width: 30px;
+            height: 15px;
+            border-bottom: 2.5px solid #E6559A;
+            border-radius: 0 0 50% 50% / 0 0 100% 100%;
+            top: 55px;
+            left: 45px;
+            transform: rotate(-10deg);
+        }
+        .blush {
+            position: absolute;
+            width: 25px;
+            height: 12px;
+            background-color: #FF9EB5;
+            border-radius: 50%;
+            top: 50px;
+            left: 80px;
+            opacity: 0.6;
+            filter: blur(2px);
+        }
+        .idle {
+            animation: idle-animation 2s ease-in-out infinite;
+        }
+        @keyframes idle-animation {
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-2%);
+            }
+        }
+        .tap .boto-body {
+            animation: tap-body-animation 0.5s forwards;
+        }
+        @keyframes tap-body-animation {
+            0%,
+            100% {
+                transform: scale(1) translateY(-50%);
+            }
+            50% {
+                transform: scale(0.98) translateY(-48%);
+            }
+        }
+        .tap::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            animation: flash-animation 0.5s ease-out forwards;
+        }
+        @keyframes flash-animation {
+            from {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+            to {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0;
+            }
+        }
+        .wave .boto-body::after {
+            animation: wave-flipper-animation 0.7s ease-in-out;
+        }
+        .wave::after {
+            content: '';
+            position: absolute;
+            left: 65%;
+            top: 70%;
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(255, 105, 180, 0.5);
+            border-radius: 50%;
+            transform: scale(0);
+            opacity: 1;
+            animation: ripple-animation 0.7s ease-out;
+        }
+        @keyframes ripple-animation {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+        @keyframes wave-flipper-animation {
+            0%,
+            100% {
+                transform: rotate(15deg);
+            }
+            50% {
+                transform: rotate(-35deg);
+            }
+        }
+        .success .boto-body {
+            animation: success-jump-animation 1s ease-in-out;
+        }
+        .success .sparkle {
+            display: block;
+        }
+        @keyframes success-jump-animation {
+            0%,
+            100% {
+                transform: translateY(-50%) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-70%) rotate(10deg);
+            }
+        }
+        .error .boto-body {
+            animation: error-shake-animation 0.5s linear;
+        }
+        .error .error-icon {
+            display: flex;
+        }
+        @keyframes error-shake-animation {
+            0%,
+            100% {
+                transform: translateX(0) translateY(-50%);
+            }
+            20% {
+                transform: translateX(-5px) translateY(-50%);
+            }
+            40% {
+                transform: translateX(5px) translateY(-50%);
+            }
+            60% {
+                transform: translateX(-5px) translateY(-50%);
+            }
+            80% {
+                transform: translateX(5px) translateY(-50%);
+            }
+        }
+        .error .mouth {
+            border-radius: 0;
+            top: 65px;
+            left: 45px;
+            height: 2px;
+            background: #E6559A;
+            width: 25px;
+            transform: rotate(0deg);
+        }
+        .loading::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120%;
+            height: 120%;
+            border: 4px solid transparent;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: loading-swirl-animation 1.5s linear infinite;
+        }
+        .loading .boto-body {
+            animation: loading-pulse-animation 1.5s ease-in-out infinite;
+        }
+        @keyframes loading-swirl-animation {
+            from {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+            to {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+        @keyframes loading-pulse-animation {
+            0%,
+            100% {
+                transform: translateY(-50%) scale(1);
+            }
+            50% {
+                transform: translateY(-50%) scale(1.05);
+            }
+        }
+        .sparkle {
+            display: none;
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #FFD700;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            animation: sparkle-animation 1s ease-out forwards;
+        }
+        .sparkle-1 {
+            top: 20%;
+            left: 10%;
+            animation-delay: 0.2s;
+        }
+        .sparkle-2 {
+            top: 30%;
+            left: 80%;
+            animation-delay: 0.4s;
+        }
+        .sparkle-3 {
+            top: 75%;
+            left: 25%;
+            animation-delay: 0.6s;
+        }
+        @keyframes sparkle-animation {
+            0% {
+                transform: scale(0) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5) rotate(180deg);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        .error-icon {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            color: #DC2626;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            animation: error-icon-fade 0.5s forwards;
+            z-index: 20;
+        }
+        @keyframes error-icon-fade {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
     }
-
-    /* Palquinho simples só pra ver bonito (opcional) */
-    html,body{height:100%}
-    body{
-      margin:0; display:grid; place-items:center;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
-      background: radial-gradient(1200px 600px at 30% -10%, #192a56 0%, #0b1220 60%);
-      color:#e6eef8;
-    }
-
-    /* O sprite em si */
-    .pet{
-      width: var(--tile);
-      height: var(--tile);
-      image-rendering: pixelated;      /* mantém o pixel art nítido */
-      background-image: var(--sheet);
-      background-repeat: no-repeat;
-      background-size: auto var(--tile);   /* altura da imagem = 1 tile */
-      background-position: 0 calc(var(--row) * (var(--tile) * -1));
-      filter: drop-shadow(0 2px 0 #0008) drop-shadow(0 6px 16px #0007);
-    }
-
-    /* Animação com steps (var(--frames)) movendo o background no eixo X */
-    @keyframes run {
-      from { background-position-x: 0; }
-      to   { background-position-x: calc((var(--frames) - 1) * var(--tile) * -1); }
-    }
-    .run{
-      animation-name: run;
-      animation-timing-function: steps(var(--frames));
-      animation-fill-mode: forwards;
-    }
-    @media (prefers-reduced-motion: reduce){ .run{ animation: none !important; } }
-
-    /* Controles de teste (pode remover no app final) */
-    .panel{margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    .panel button{
-      background:#16233f;border:1px solid #263556;color:#e6eef8;
-      padding:8px 12px;border-radius:12px;cursor:pointer
-    }
-    .panel button:hover{background:#1b2a4e}
-    .wrap{display:grid;place-items:center;gap:10px}
   </style>
-</head>
-<body>
-  <div class="wrap">
-  <!-- O BOTO - agora como web component -->
-  <boto-component id="pet" size="128" tile="64" sheet="minerbits-boto-minimal/boto.png" role="img" aria-label="Boto cor-de-rosa"></boto-component>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display flex flex-col items-center justify-center min-h-screen p-4">
+<div class="flex flex-col items-center space-y-8">
+<div class="boto-container" id="boto-container">
+<div class="boto-body" id="boto-body">
+<div class="snout"></div>
+<div class="eye"></div>
+<div class="mouth"></div>
+<div class="blush"></div>
+</div>
+<div class="sparkle sparkle-1"></div>
+<div class="sparkle sparkle-2"></div>
+<div class="sparkle sparkle-3"></div>
+<div class="error-icon" id="error-icon">?</div>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full max-w-md">
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('idle')">Idle</button>
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('tap')">Tap</button>
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('wave')">Wave</button>
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('success')">Success</button>
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('error')">Error</button>
+<button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('loading')">Loading</button>
+</div>
+</div>
+<script>
+        const botoContainer = document.getElementById('boto-container');
+        const botoBody = document.getElementById('boto-body');
+        const errorIcon = document.getElementById('error-icon');
+        let currentAnimation = 'idle';
+        botoContainer.classList.add('idle');
+        function playAnimation(animationName) {
+            botoContainer.classList.remove('idle', 'tap', 'wave', 'success', 'error', 'loading');
+            void botoContainer.offsetWidth;
+            botoContainer.classList.add(animationName);
+            currentAnimation = animationName;
+            if (animationName === 'error') {
+                errorIcon.textContent = Math.random() < 0.5 ? '?' : 'X';
+            }
+            if (!['idle', 'loading'].includes(animationName)) {
+                let duration = 500; // default for tap and error
+                if (animationName === 'wave') duration = 700;
+                if (animationName === 'success') duration = 1000;
+                setTimeout(() => {
+                    if (currentAnimation === animationName) {
+                        playAnimation('idle');
+                    }
+                }, duration);
+            }
+        }
+    </script>
 
-    <!-- Botões de teste (opcional) -->
-    <div class="panel">
-      <button data-action="tap">Tap</button>
-      <button data-action="wave">Wave</button>
-      <button data-action="success">Success</button>
-      <button data-action="error">Error</button>
-      <button data-action="loading">Loading</button>
-      <button data-action="idle">Idle</button>
-    </div>
-  </div>
-
-  <script type="module">
-    import './minerbits-boto-minimal/src/boto-component.js';
-
-    const pet = document.getElementById('pet');
-
-    // Hook buttons to the component API
-    document.querySelectorAll('[data-action]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const state = b.dataset.action;
-        // play returns a promise for non-loop states
-        try{ await pet.play(state); }catch(e){ /* ignore */ }
-      });
-    });
-
-    window.addEventListener('keydown', e => {
-      const i = +e.key - 1, K = ['idle','tap','wave','success','error','loading'];
-      if (i >= 0 && i < K.length) pet.play(K[i]);
-    });
-
-    // optional: listen for when a non-loop finishes
-    pet.addEventListener('ended', (ev) => {
-      console.log('animation ended', ev.detail);
-    });
-
-    // start idle
-    pet.play('idle');
-  </script>
-</body>
-</html>
+</body></html>
