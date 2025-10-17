@@ -18,30 +18,30 @@
         }
         .boto-container {
             position: relative;
-            width: 256px;
-            height: 256px;
+            width: 180px;
+            height: 180px;
         }
         .boto-body {
             position: relative;
-            width: 200px;
-            height: 100px;
+            width: 140px;
+            height: 70px;
             background-color: #FFC0CB;
-            border-radius: 100px 100px 60px 60px / 70px 70px 110px 110px;
+            border-radius: 70px 70px 40px 40px / 50px 50px 80px 80px;
             margin: auto;
             top: 50%;
             transform: translateY(-50%);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
             z-index: 10;
         }
         .boto-body::before {
             content: '';
             position: absolute;
-            width: 120px;
-            height: 70px;
+            width: 85px;
+            height: 50px;
             background-color: #FFB6C1;
             border-radius: 50%;
-            right: -55px;
-            top: 25px;
+            right: -40px;
+            top: 18px;
             transform: rotate(-40deg);
             z-index: -1;
             clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
@@ -49,66 +49,66 @@
         .boto-body::after {
             content: '';
             position: absolute;
-            width: 40px;
-            height: 35px;
+            width: 28px;
+            height: 25px;
             background-color: #FFB6C1;
-            border-radius: 20px 20px 15px 15px / 25px 25px 20px 20px;
-            left: 80px;
-            bottom: -15px;
+            border-radius: 14px 14px 10px 10px / 18px 18px 14px 14px;
+            left: 56px;
+            bottom: -10px;
             transform: rotate(15deg);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
         }
         .snout {
             position: absolute;
-            width: 70px;
-            height: 35px;
+            width: 50px;
+            height: 25px;
             background-color: #FFC0CB;
-            border-radius: 20px 20px 15px 15px / 25px 25px 15px 15px;
-            left: -35px;
-            top: 45px;
+            border-radius: 12px 12px 10px 10px / 18px 18px 10px 10px;
+            left: -25px;
+            top: 32px;
             transform: rotate(-5deg);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.05);
         }
         .eye {
             position: absolute;
-            width: 14px;
-            height: 14px;
+            width: 10px;
+            height: 10px;
             background-color: #2c2c2c;
             border-radius: 50%;
-            top: 35px;
-            left: 55px;
-            box-shadow: 0 0 0 2px #fff;
+            top: 25px;
+            left: 40px;
+            box-shadow: 0 0 0 1.5px #fff;
         }
         .eye::after {
             content: '';
             position: absolute;
-            width: 5px;
-            height: 5px;
+            width: 3px;
+            height: 3px;
             background-color: white;
             border-radius: 50%;
-            top: 3px;
-            left: 3px;
+            top: 2px;
+            left: 2px;
         }
         .mouth {
             position: absolute;
-            width: 30px;
-            height: 15px;
-            border-bottom: 2.5px solid #E6559A;
+            width: 22px;
+            height: 11px;
+            border-bottom: 2px solid #E6559A;
             border-radius: 0 0 50% 50% / 0 0 100% 100%;
-            top: 55px;
-            left: 45px;
+            top: 40px;
+            left: 32px;
             transform: rotate(-10deg);
         }
         .blush {
             position: absolute;
-            width: 25px;
-            height: 12px;
+            width: 18px;
+            height: 8px;
             background-color: #FF9EB5;
             border-radius: 50%;
-            top: 50px;
-            left: 80px;
+            top: 36px;
+            left: 58px;
             opacity: 0.6;
-            filter: blur(2px);
+            filter: blur(1.5px);
         }
         .idle {
             animation: idle-animation 2s ease-in-out infinite;
@@ -164,8 +164,8 @@
             position: absolute;
             left: 65%;
             top: 70%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             border: 2px solid rgba(255, 105, 180, 0.5);
             border-radius: 50%;
             transform: scale(0);
@@ -203,7 +203,7 @@
                 transform: translateY(-50%) rotate(0deg);
             }
             50% {
-                transform: translateY(-70%) rotate(10deg);
+                transform: translateY(-65%) rotate(10deg);
             }
         }
         .error .boto-body {
@@ -218,25 +218,25 @@
                 transform: translateX(0) translateY(-50%);
             }
             20% {
-                transform: translateX(-5px) translateY(-50%);
+                transform: translateX(-4px) translateY(-50%);
             }
             40% {
-                transform: translateX(5px) translateY(-50%);
+                transform: translateX(4px) translateY(-50%);
             }
             60% {
-                transform: translateX(-5px) translateY(-50%);
+                transform: translateX(-4px) translateY(-50%);
             }
             80% {
-                transform: translateX(5px) translateY(-50%);
+                transform: translateX(4px) translateY(-50%);
             }
         }
         .error .mouth {
             border-radius: 0;
-            top: 65px;
-            left: 45px;
+            top: 48px;
+            left: 32px;
             height: 2px;
             background: #E6559A;
-            width: 25px;
+            width: 18px;
             transform: rotate(0deg);
         }
         .loading::before {
@@ -246,7 +246,7 @@
             left: 50%;
             width: 120%;
             height: 120%;
-            border: 4px solid transparent;
+            border: 3px solid transparent;
             border-top-color: var(--primary);
             border-radius: 50%;
             transform: translate(-50%, -50%);
@@ -275,25 +275,25 @@
         .sparkle {
             display: none;
             position: absolute;
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             background: #FFD700;
             clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
             animation: sparkle-animation 1s ease-out forwards;
         }
         .sparkle-1 {
-            top: 20%;
-            left: 10%;
+            top: 15%;
+            left: 8%;
             animation-delay: 0.2s;
         }
         .sparkle-2 {
-            top: 30%;
-            left: 80%;
+            top: 25%;
+            left: 75%;
             animation-delay: 0.4s;
         }
         .sparkle-3 {
-            top: 75%;
-            left: 25%;
+            top: 70%;
+            left: 20%;
             animation-delay: 0.6s;
         }
         @keyframes sparkle-animation {
@@ -316,7 +316,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 80px;
+            font-size: 60px;
             color: #DC2626;
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
@@ -334,6 +334,16 @@
             }
         }
     </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
 <style>
     body {
       min-height: max(884px, 100dvh);
@@ -389,5 +399,4 @@
             }
         }
     </script>
-
 </body></html>
