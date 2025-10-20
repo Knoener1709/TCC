@@ -730,28 +730,27 @@
         </button>
     </div>
     
-    <!-- API Settings -->
+    <!-- API / Proxy Settings -->
     <div class="api-settings">
         <div class="api-settings-label">
             <span class="material-icons" style="font-size: 16px;">vpn_key</span>
-            Configurar Google Gemini API Key
+            Configurar token do projeto (proxy)
         </div>
         <div class="api-input-group">
-            <input type="password" class="api-input" id="apiKeyInput" placeholder="AIza...">
-            <button class="api-save-btn" onclick="saveApiKey()">Salvar</button>
+            <input type="password" class="api-input" id="apiKeyInput" placeholder="token-do-projeto...">
+            <button class="api-save-btn" onclick="saveClientToken()">Salvar</button>
         </div>
         <div class="api-status" id="apiStatus">
             <span class="material-icons" style="font-size: 14px;">info</span>
-            Configure sua chave para usar a IA (1500 msgs/dia grátis!)
+            Configure o token do cliente para usar o assistente via proxy do projeto.
         </div>
     </div>
     
     <div class="chat-messages" id="chatMessages">
         <div class="message boto">
             Olá! Eu sou o Boto, seu assistente virtual inteligente! 🐬💗<br><br>
-            Para começar, você precisa configurar sua chave da API Google Gemini acima.<br>
-            É GRÁTIS e tem 1500 mensagens por dia!<br><br>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #FF1493; text-decoration: underline;">Clique aqui para obter sua chave grátis</a>
+            Para começar, configure o token do cliente (Configurações de API) para usar o assistente via o proxy do projeto.<br>
+            Se você estiver rodando um servidor local, o token padrão de desenvolvimento está no README do servidor.
         </div>
     </div>
     <div class="chat-input-container">
@@ -793,31 +792,31 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const apiStatus = document.getElementById('apiStatus');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiStatus = document.getElementById('apiStatus');
         
-        let apiKey = localStorage.getItem('gemini_api_key') || '';
+    // Client token for proxy authentication. Store in localStorage for dev/testing.
+    // In production you would issue a short-lived token via an auth flow.
+    let clientToken = localStorage.getItem('boto_client_token') || '';
         let conversationHistory = [];
         
-        // Load saved API key on startup
-        if (apiKey) {
-            apiKeyInput.value = apiKey;
-            updateApiStatus('connected', 'API Key configurada ✓ (1500 msgs/dia)');
+        // Load saved client token on startup
+        if (clientToken) {
+            apiKeyInput.value = clientToken;
+            updateApiStatus('connected', 'Client token encontrado. Usando proxy do projeto.');
         }
-        
-        function saveApiKey() {
-            const key = apiKeyInput.value.trim();
-            if (!key.startsWith('AIza')) {
-                updateApiStatus('error', 'Chave inválida! Deve começar com "AIza"');
+
+        function saveClientToken() {
+            const token = apiKeyInput.value.trim();
+            if (!token) {
+                updateApiStatus('error', 'Token inválido!');
                 playAnimation('error');
                 return;
             }
-            
-            apiKey = key;
-            localStorage.setItem('gemini_api_key', apiKey);
-            updateApiStatus('connected', 'API Key salva com sucesso! ✓ (1500 msgs/dia)');
+            clientToken = token;
+            localStorage.setItem('boto_client_token', clientToken);
+            updateApiStatus('connected', 'Client token salvo localmente.');
             playAnimation('success');
-            
             // Clear and reset conversation
             conversationHistory = [];
         }
@@ -862,112 +861,73 @@
         
         function removeTypingIndicator() {
             const typingDiv = document.getElementById('typingIndicator');
-            if (typingDiv) typingDiv.remove();
-        }
-        
-        async function callGemini(userMessage) {
-            if (!apiKey) {
-                return 'Por favor, configure sua API Key do Google Gemini primeiro! 🔑';
-            }
-            
-            // Build conversation history for Gemini format
-            let conversationText = '';
-            
-            // Add system prompt
-            conversationText = `Você é o Boto, um assistente virtual amigável e inteligente em forma de boto cor-de-rosa. 
-Você é carismático, prestativo e sempre tenta ajudar da melhor forma. 
-Use emojis ocasionalmente (🐬💗✨) para tornar a conversa mais divertida.
-Seja conciso mas informativo. Responda sempre em português do Brasil.\n\n`;
-            
-            // Add conversation history
-            conversationHistory.forEach(msg => {
-                conversationText += `${msg.role === 'user' ? 'Usuário' : 'Boto'}: ${msg.content}\n\n`;
-            });
-            
-            // Add current message
-            conversationText += `Usuário: ${userMessage}\n\nBoto:`;
-            
-            // Add to history
-            conversationHistory.push({
-                role: 'user',
-                content: userMessage
-            });
-            
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: conversationText
-                            }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            maxOutputTokens: 500,
-                            topP: 0.8,
-                            topK: 40
+            async function callProxy(userMessage) {
+                // Prefer proxy if available. The proxy expects Authorization: Bearer <token>
+                const proxyUrl = window.location.origin.replace(/:\d+$/, '') + ':3000/api/generate';
+
+                // Build conversation text (keeps system prompt + history)
+                let conversationText = `Você é o Boto, um assistente virtual amigável e inteligente em forma de boto cor-de-rosa. 
+    Você é carismático, prestativo e sempre tenta ajudar da melhor forma. 
+    Use emojis ocasionalmente (🐬💗✨) para tornar a conversa mais divertida.
+    Seja conciso mas informativo. Responda sempre em português do Brasil.\n\n`;
+
+                conversationHistory.forEach(msg => {
+                    conversationText += `${msg.role === 'user' ? 'Usuário' : 'Boto'}: ${msg.content}\n\n`;
+                });
+
+                conversationText += `Usuário: ${userMessage}\n\nBoto:`;
+
+                conversationHistory.push({ role: 'user', content: userMessage });
+
+                // If clientToken exists, call proxy
+                if (clientToken) {
+                    try {
+                        const resp = await fetch(`${window.location.protocol}//${window.location.hostname}:3000/api/generate`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${clientToken}`
+                            },
+                            body: JSON.stringify({ message: conversationText })
+                        });
+
+                        if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({}));
+                            console.error('Proxy Error:', err);
+                            if (resp.status === 401) {
+                                return 'Acesso negado ao proxy. Token inválido ou ausente. 🔒';
+                            }
+                            if (resp.status === 429) {
+                                return 'Limite do servidor atingido. Tente novamente mais tarde. ⏰';
+                            }
+                            return 'Erro no servidor. Tente novamente mais tarde. 😅';
                         }
-                    })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    console.error('Gemini Error:', error);
-                    
-                    if (response.status === 400) {
-                        updateApiStatus('error', 'API Key inválida!');
-                        return 'Ops! Sua API Key parece estar inválida. Por favor, verifique e tente novamente. 🔑';
-                    } else if (response.status === 429) {
-                        return 'Desculpe, você atingiu o limite de requisições. Tente novamente em alguns instantes. ⏰';
-                    } else {
-                        return 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente! 😅';
+
+                        const data = await resp.json();
+                        const assistantMessage = data.reply || 'Desculpe, resposta vazia do servidor.';
+
+                        conversationHistory.push({ role: 'assistant', content: assistantMessage });
+                        if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+                        return assistantMessage;
+
+                    } catch (error) {
+                        console.error('Error calling proxy:', error);
+                        return 'Erro ao chamar o proxy. Verifique o token e se o servidor está rodando.';
                     }
                 }
-                
-                const data = await response.json();
-                
-                // Extract the response text
-                let assistantMessage = '';
-                if (data.candidates && data.candidates.length > 0) {
-                    const candidate = data.candidates[0];
-                    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                        assistantMessage = candidate.content.parts[0].text;
-                    }
-                }
-                
-                if (!assistantMessage) {
-                    return 'Hmm, não consegui gerar uma resposta. Tente reformular sua pergunta! 🤔';
-                }
-                
-                // Add assistant response to history
-                conversationHistory.push({
-                    role: 'assistant',
-                    content: assistantMessage
-                });
-                
-                // Keep conversation history manageable (last 8 messages - 4 exchanges)
-                if (conversationHistory.length > 8) {
-                    conversationHistory = conversationHistory.slice(-8);
-                }
-                
-                return assistantMessage;
-                
-            } catch (error) {
-                console.error('Error calling Gemini:', error);
-                return 'Ops! Tive um problema ao me conectar com a IA. Verifique sua conexão com a internet. 🌐';
+
+                // If no client token, instruct user to configure it
+                return 'Por favor, configure o token do cliente para usar o assistente do projeto.';
             }
-        }
+            }
+        
         
         async function sendMessage() {
             const message = chatInput.value.trim();
             if (message === '') return;
             
-            if (!apiKey) {
-                addMessage('Por favor, configure sua API Key do Google Gemini primeiro! ⬆️', 'boto');
+            if (!clientToken) {
+                addMessage('Por favor, configure o token do cliente nas Configurações de API para usar o assistente do projeto.', 'boto');
                 playAnimation('error');
                 return;
             }
@@ -984,8 +944,8 @@ Seja conciso mas informativo. Responda sempre em português do Brasil.\n\n`;
             // Show typing indicator
             showTypingIndicator();
             
-            // Call Gemini API
-            const response = await callGemini(message);
+            // Call project proxy
+            const response = await callProxy(message);
             
             // Remove typing indicator
             removeTypingIndicator();
