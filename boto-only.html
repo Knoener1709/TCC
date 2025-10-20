@@ -333,6 +333,348 @@
                 transform: translate(-50%, -50%) scale(1);
             }
         }
+        
+        /* Chat Styles */
+        .chat-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 105, 180, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            z-index: 1000;
+        }
+        
+        .chat-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(255, 105, 180, 0.6);
+        }
+        
+        .chat-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 999;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        
+        .dark .chat-container {
+            background: #2D3748;
+        }
+        
+        .chat-container.active {
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .chat-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .chat-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #F7FAFC;
+        }
+        
+        .dark .chat-messages {
+            background: #1A202C;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            animation: messageAppear 0.3s ease-out;
+        }
+        
+        @keyframes messageAppear {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.user {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.boto {
+            background: white;
+            color: #1A202C;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .message.boto {
+            background: #2D3748;
+            color: #F7FAFC;
+        }
+        
+        .chat-input-container {
+            padding: 16px;
+            background: white;
+            border-top: 1px solid #E2E8F0;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .dark .chat-input-container {
+            background: #2D3748;
+            border-top-color: #4A5568;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #E2E8F0;
+            border-radius: 20px;
+            outline: none;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.2s;
+        }
+        
+        .chat-input:focus {
+            border-color: #FF69B4;
+        }
+        
+        .dark .chat-input {
+            background: #1A202C;
+            border-color: #4A5568;
+            color: #F7FAFC;
+        }
+        
+        .chat-send {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        .chat-send:hover {
+            transform: scale(1.1);
+        }
+        
+        .chat-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        
+        /* API Settings Styles */
+        .api-settings {
+            background: #FFF3F8;
+            border: 1px solid #FFD6E8;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .dark .api-settings {
+            background: #2D1F25;
+            border-color: #4A2F3A;
+        }
+        
+        .api-settings-label {
+            font-size: 12px;
+            color: #FF1493;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .dark .api-settings-label {
+            color: #FF69B4;
+        }
+        
+        .api-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .api-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            font-size: 12px;
+            outline: none;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        .api-input:focus {
+            border-color: #FF69B4;
+        }
+        
+        .dark .api-input {
+            background: #1A202C;
+            border-color: #4A5568;
+            color: #F7FAFC;
+        }
+        
+        .api-save-btn {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+        
+        .api-save-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .api-status {
+            font-size: 11px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .api-status.connected {
+            color: #10B981;
+        }
+        
+        .api-status.error {
+            color: #EF4444;
+        }
+        
+        .dark .api-status {
+            color: #A0AEC0;
+        }
+        
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 14px;
+            background: white;
+            border-radius: 12px;
+            width: fit-content;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .typing-indicator {
+            background: #2D3748;
+        }
+        
+        .typing-indicator.active {
+            display: flex;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #FF69B4;
+            border-radius: 50%;
+            animation: typingDot 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typingDot {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
     </style>
 <style>
     body {
@@ -373,6 +715,53 @@
 <button class="bg-button-light dark:bg-button-dark text-text-light dark:text-text-dark py-3 px-4 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" onclick="playAnimation('loading')">Loading</button>
 </div>
 </div>
+
+<!-- Chat Button -->
+<button class="chat-button" id="chatButton" onclick="toggleChat()">
+    <span class="material-icons">chat</span>
+</button>
+
+<!-- Chat Container -->
+<div class="chat-container" id="chatContainer">
+    <div class="chat-header">
+        <h3>💬 Chat com Boto</h3>
+        <button class="chat-close" onclick="toggleChat()">
+            <span class="material-icons">close</span>
+        </button>
+    </div>
+    
+    <!-- API Settings -->
+    <div class="api-settings">
+        <div class="api-settings-label">
+            <span class="material-icons" style="font-size: 16px;">vpn_key</span>
+            Configurar Google Gemini API Key
+        </div>
+        <div class="api-input-group">
+            <input type="password" class="api-input" id="apiKeyInput" placeholder="AIza...">
+            <button class="api-save-btn" onclick="saveApiKey()">Salvar</button>
+        </div>
+        <div class="api-status" id="apiStatus">
+            <span class="material-icons" style="font-size: 14px;">info</span>
+            Configure sua chave para usar a IA (1500 msgs/dia grátis!)
+        </div>
+    </div>
+    
+    <div class="chat-messages" id="chatMessages">
+        <div class="message boto">
+            Olá! Eu sou o Boto, seu assistente virtual inteligente! 🐬💗<br><br>
+            Para começar, você precisa configurar sua chave da API Google Gemini acima.<br>
+            É GRÁTIS e tem 1500 mensagens por dia!<br><br>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #FF1493; text-decoration: underline;">Clique aqui para obter sua chave grátis</a>
+        </div>
+    </div>
+    <div class="chat-input-container">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Digite sua mensagem..." onkeypress="handleKeyPress(event)">
+        <button class="chat-send" id="sendButton" onclick="sendMessage()">
+            <span class="material-icons">send</span>
+        </button>
+    </div>
+</div>
+
 <script>
         const botoContainer = document.getElementById('boto-container');
         const botoBody = document.getElementById('boto-body');
@@ -396,6 +785,224 @@
                         playAnimation('idle');
                     }
                 }, duration);
+            }
+        }
+        
+        // Chat Functions
+        const chatContainer = document.getElementById('chatContainer');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const apiStatus = document.getElementById('apiStatus');
+        
+        let apiKey = localStorage.getItem('gemini_api_key') || '';
+        let conversationHistory = [];
+        
+        // Load saved API key on startup
+        if (apiKey) {
+            apiKeyInput.value = apiKey;
+            updateApiStatus('connected', 'API Key configurada ✓ (1500 msgs/dia)');
+        }
+        
+        function saveApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (!key.startsWith('AIza')) {
+                updateApiStatus('error', 'Chave inválida! Deve começar com "AIza"');
+                playAnimation('error');
+                return;
+            }
+            
+            apiKey = key;
+            localStorage.setItem('gemini_api_key', apiKey);
+            updateApiStatus('connected', 'API Key salva com sucesso! ✓ (1500 msgs/dia)');
+            playAnimation('success');
+            
+            // Clear and reset conversation
+            conversationHistory = [];
+        }
+        
+        function updateApiStatus(status, message) {
+            apiStatus.className = `api-status ${status}`;
+            const icon = status === 'connected' ? 'check_circle' : 
+                        status === 'error' ? 'error' : 'info';
+            apiStatus.innerHTML = `<span class="material-icons" style="font-size: 14px;">${icon}</span>${message}`;
+        }
+        
+        function toggleChat() {
+            chatContainer.classList.toggle('active');
+            if (chatContainer.classList.contains('active')) {
+                chatInput.focus();
+                playAnimation('wave');
+            } else {
+                playAnimation('idle');
+            }
+        }
+        
+        function addMessage(text, sender, isHtml = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            if (isHtml) {
+                messageDiv.innerHTML = text;
+            } else {
+                messageDiv.textContent = text;
+            }
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator active';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function removeTypingIndicator() {
+            const typingDiv = document.getElementById('typingIndicator');
+            if (typingDiv) typingDiv.remove();
+        }
+        
+        async function callGemini(userMessage) {
+            if (!apiKey) {
+                return 'Por favor, configure sua API Key do Google Gemini primeiro! 🔑';
+            }
+            
+            // Build conversation history for Gemini format
+            let conversationText = '';
+            
+            // Add system prompt
+            conversationText = `Você é o Boto, um assistente virtual amigável e inteligente em forma de boto cor-de-rosa. 
+Você é carismático, prestativo e sempre tenta ajudar da melhor forma. 
+Use emojis ocasionalmente (🐬💗✨) para tornar a conversa mais divertida.
+Seja conciso mas informativo. Responda sempre em português do Brasil.\n\n`;
+            
+            // Add conversation history
+            conversationHistory.forEach(msg => {
+                conversationText += `${msg.role === 'user' ? 'Usuário' : 'Boto'}: ${msg.content}\n\n`;
+            });
+            
+            // Add current message
+            conversationText += `Usuário: ${userMessage}\n\nBoto:`;
+            
+            // Add to history
+            conversationHistory.push({
+                role: 'user',
+                content: userMessage
+            });
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: conversationText
+                            }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 500,
+                            topP: 0.8,
+                            topK: 40
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Gemini Error:', error);
+                    
+                    if (response.status === 400) {
+                        updateApiStatus('error', 'API Key inválida!');
+                        return 'Ops! Sua API Key parece estar inválida. Por favor, verifique e tente novamente. 🔑';
+                    } else if (response.status === 429) {
+                        return 'Desculpe, você atingiu o limite de requisições. Tente novamente em alguns instantes. ⏰';
+                    } else {
+                        return 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente! 😅';
+                    }
+                }
+                
+                const data = await response.json();
+                
+                // Extract the response text
+                let assistantMessage = '';
+                if (data.candidates && data.candidates.length > 0) {
+                    const candidate = data.candidates[0];
+                    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                        assistantMessage = candidate.content.parts[0].text;
+                    }
+                }
+                
+                if (!assistantMessage) {
+                    return 'Hmm, não consegui gerar uma resposta. Tente reformular sua pergunta! 🤔';
+                }
+                
+                // Add assistant response to history
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: assistantMessage
+                });
+                
+                // Keep conversation history manageable (last 8 messages - 4 exchanges)
+                if (conversationHistory.length > 8) {
+                    conversationHistory = conversationHistory.slice(-8);
+                }
+                
+                return assistantMessage;
+                
+            } catch (error) {
+                console.error('Error calling Gemini:', error);
+                return 'Ops! Tive um problema ao me conectar com a IA. Verifique sua conexão com a internet. 🌐';
+            }
+        }
+        
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (message === '') return;
+            
+            if (!apiKey) {
+                addMessage('Por favor, configure sua API Key do Google Gemini primeiro! ⬆️', 'boto');
+                playAnimation('error');
+                return;
+            }
+            
+            // Add user message
+            addMessage(message, 'user');
+            chatInput.value = '';
+            
+            // Disable input while processing
+            chatInput.disabled = true;
+            sendButton.disabled = true;
+            playAnimation('loading');
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Call Gemini API
+            const response = await callGemini(message);
+            
+            // Remove typing indicator
+            removeTypingIndicator();
+            
+            // Add AI response
+            addMessage(response, 'boto');
+            
+            // Re-enable input
+            chatInput.disabled = false;
+            sendButton.disabled = false;
+            chatInput.focus();
+            playAnimation('success');
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
             }
         }
     </script>
