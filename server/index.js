@@ -4,6 +4,7 @@ const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const cors = require('cors');
+const crypto = require('crypto');
 
 const app = express();
 app.use(helmet());
@@ -20,6 +21,32 @@ const MOCK_GEMINI = (process.env.MOCK_GEMINI || 'false').toLowerCase() === 'true
 // Determine configured provider (mock or openai, or none)
 // NOTE: Gemini branch intentionally removed to avoid requiring/using Gemini keys anywhere.
 const PROVIDER = MOCK_GEMINI ? 'mock' : (OPENAI_API_KEY ? 'openai' : 'none');
+
+// In-memory conversation sessions
+// Map<sessionId, Array<{role: 'system'|'user'|'assistant', content: string}>>
+const sessions = new Map();
+
+function generateSessionId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // Fallback UUID v4-ish
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function getOrCreateSession(sessionId) {
+  let sid = sessionId || generateSessionId();
+  if (!sessions.has(sid)) {
+    sessions.set(sid, [
+      {
+        role: 'system',
+        content: 'Você é o Boto, um assistente virtual amigável, carismático e útil, em forma de boto cor-de-rosa. Fale sempre em português do Brasil, seja claro e acolhedor, utilize emojis de forma moderada (🐬💗✨) para dar leveza, e tente manter respostas concisas mas completas. Se necessário, faça perguntas de esclarecimento. Evite respostas muito longas. '
+      }
+    ]);
+  }
+  return { id: sid, messages: sessions.get(sid) };
+}
 
 // Basic rate limiter per IP
 const limiter = rateLimit({
@@ -50,35 +77,43 @@ function requireClientToken(req, res, next) {
 }
 
 // POST /api/generate
-// Body: { message: string }
+// Body: { message: string, sessionId?: string }
 app.post('/api/generate', requireClientToken, async (req, res) => {
-  const { message } = req.body || {};
+  const { message, sessionId } = req.body || {};
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'Invalid or missing "message" in body' });
   }
-
-  // Build the Gemini request payload similar to client
-  const conversationText = `Usuário: ${message}\n\nBoto:`;
+  // Get session (create if missing)
+  const session = getOrCreateSession(sessionId);
 
 
   try {
     // Mock mode: if MOCK_GEMINI=true, return a canned reply
     if (MOCK_GEMINI) {
-      const assistantMessage = `Olá! (Resposta simulada) Eu sou o Boto em modo de teste. Você disse: "${message}"`;
-      return res.json({ reply: assistantMessage });
+      const assistantMessage = `Olá! (modo de teste) Você disse: "${message}". Estou aqui para ajudar com o que precisar. 🐬`;
+      // Save into session
+      session.messages.push({ role: 'user', content: message });
+      session.messages.push({ role: 'assistant', content: assistantMessage });
+      // Trim history to last N pairs + system
+      if (session.messages.length > 1 + 20) {
+        const [system, ...rest] = session.messages;
+        session.messages = [system, ...rest.slice(-20)];
+        sessions.set(session.id, session.messages);
+      }
+      return res.json({ reply: assistantMessage, sessionId: session.id });
     }
 
     // Prefer OpenAI if key is configured
     if (OPENAI_API_KEY) {
       try {
+        // Append new user message to session history
+        session.messages.push({ role: 'user', content: message });
+
         const resp = await axios.post(
           'https://api.openai.com/v1/chat/completions',
           {
             model: OPENAI_MODEL,
-            messages: [
-              { role: 'system', content: `Você é o Boto, um assistente virtual amigável e inteligente em forma de boto cor-de-rosa. Use emojis ocasionalmente (🐬💗✨). Responda em português do Brasil.` },
-              { role: 'user', content: conversationText }
-            ],
+            messages: session.messages,
             temperature: 0.7,
             max_tokens: 500
           },
@@ -87,7 +122,7 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${OPENAI_API_KEY}`
             },
-            timeout: 20000
+            timeout: 30000
           }
         );
 
@@ -102,7 +137,16 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
           return res.status(502).json({ error: 'Empty response from OpenAI' });
         }
 
-        return res.json({ reply: assistantMessage });
+        // Save assistant reply in session
+        session.messages.push({ role: 'assistant', content: assistantMessage });
+        // Trim history to keep memory bounded (keep system + last 20 messages)
+        if (session.messages.length > 1 + 20) {
+          const [system, ...rest] = session.messages;
+          session.messages = [system, ...rest.slice(-20)];
+        }
+        sessions.set(session.id, session.messages);
+
+        return res.json({ reply: assistantMessage, sessionId: session.id });
       } catch (err) {
         console.error('OpenAI proxy error:', err?.response?.data || err.message || err);
         const status = err?.response?.status || 500;
@@ -120,6 +164,14 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
     const msg = err?.response?.data || { error: 'Upstream error' };
     return res.status(status).json({ error: msg });
   }
+});
+
+// Optional: reset a session (Body: { sessionId })
+app.post('/api/reset', requireClientToken, (req, res) => {
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
+  sessions.delete(sessionId);
+  return res.json({ ok: true });
 });
 
 const HOST = process.env.HOST || '127.0.0.1';

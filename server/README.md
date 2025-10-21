@@ -31,9 +31,16 @@ npm start
 Authorization: Bearer <APP_CLIENT_TOKEN>
 ```
 
-5. OpenAI usage
+5. OpenAI usage and conversations
 
 The proxy prefers OpenAI when `OPENAI_API_KEY` is present. For quick local testing you can enable mock mode by setting `MOCK_GEMINI=true` in `.env`.
+
+The endpoint `/api/generate` now supports multi-turn conversations with a `sessionId`:
+
+- Request: `{ message: string, sessionId?: string }`
+- Response: `{ reply: string, sessionId: string }`
+
+If `sessionId` is omitted, the server will create one and return it. Send it back on subsequent turns to preserve context. A helper endpoint `/api/reset` is available to clear a session by id.
 
 Notes & cautions:
 - This proxy uses a simple static token for demo purposes. For production, implement proper auth (OAuth/JWT) and persistent rate limiting (Redis).

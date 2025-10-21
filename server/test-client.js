@@ -1,9 +1,11 @@
 const axios = require('axios');
 
 async function test() {
+  const token = process.env.APP_CLIENT_TOKEN || 'dev-token-change-me';
+  const url = process.env.PROXY_URL || 'http://127.0.0.1:3123/api/generate';
   try {
-    const res = await axios.post('http://127.0.0.1:3000/api/generate', { message: 'Teste via test-client' }, {
-      headers: { Authorization: 'Bearer dev-local-token-CHANGE_ME' }
+    const res = await axios.post(url, { message: 'Teste via test-client' }, {
+      headers: { Authorization: `Bearer ${token}` }
     });
     console.log('status:', res.status);
     console.log('data:', res.data);

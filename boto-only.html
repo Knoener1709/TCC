@@ -730,27 +730,24 @@
         </button>
     </div>
     
-    <!-- API / Proxy Settings -->
-    <div class="api-settings">
+    <!-- API / Proxy Settings (hidden; defaults are auto-configured) -->
+    <div class="api-settings" style="display:none">
         <div class="api-settings-label">
             <span class="material-icons" style="font-size: 16px;">vpn_key</span>
-            Configurar token do projeto (proxy)
+            Configurar acesso ao proxy do projeto
         </div>
         <div class="api-input-group">
+            <input type="text" class="api-input" id="apiUrlInput" placeholder="http://127.0.0.1:3000">
             <input type="password" class="api-input" id="apiKeyInput" placeholder="token-do-projeto...">
-            <button class="api-save-btn" onclick="saveClientToken()">Salvar</button>
+            <button class="api-save-btn" onclick="saveApiSettings()">Salvar</button>
         </div>
-        <div class="api-status" id="apiStatus">
-            <span class="material-icons" style="font-size: 14px;">info</span>
-            Configure o token do cliente para usar o assistente via proxy do projeto.
-        </div>
+        <div class="api-status" id="apiStatus"></div>
     </div>
     
     <div class="chat-messages" id="chatMessages">
         <div class="message boto">
-            Olá! Eu sou o Boto, seu assistente virtual inteligente! 🐬💗<br><br>
-            Para começar, configure o token do cliente (Configurações de API) para usar o assistente via o proxy do projeto.<br>
-            Se você estiver rodando um servidor local, o token padrão de desenvolvimento está no README do servidor.
+            Olá! Eu sou o Boto, seu assistente virtual inteligente! 🐬💗 Pode mandar sua mensagem quando quiser.<br><br>
+            Dica: certifique-se de que o servidor do projeto está rodando localmente. Se eu não responder, abra o servidor e tente novamente.
         </div>
     </div>
     <div class="chat-input-container">
@@ -792,30 +789,72 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
+    const apiUrlInput = document.getElementById('apiUrlInput');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const apiStatus = document.getElementById('apiStatus');
         
-    // Client token for proxy authentication. Store in localStorage for dev/testing.
-    // In production you would issue a short-lived token via an auth flow.
-    let clientToken = localStorage.getItem('boto_client_token') || '';
+    // Client token & proxy URL defaults (sem exigir input do usuário)
+    const DEFAULT_CLIENT_TOKEN = 'dev-token-change-me';
+    // Força o token fixo, ignorando qualquer valor salvo anteriormente
+    let clientToken = DEFAULT_CLIENT_TOKEN;
+    try { localStorage.setItem('boto_client_token', DEFAULT_CLIENT_TOKEN); } catch(_) {}
+    // Se a página estiver aberta via file://, o hostname fica vazio; use 127.0.0.1
+    const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+    const defaultHost = isHttp && window.location.hostname ? window.location.hostname : '127.0.0.1';
+    let proxyBaseUrl = localStorage.getItem('boto_proxy_url') || `http://${defaultHost}:3000`;
         let conversationHistory = [];
         
         // Load saved client token on startup
-        if (clientToken) {
-            apiKeyInput.value = clientToken;
-            updateApiStatus('connected', 'Client token encontrado. Usando proxy do projeto.');
-        }
+    apiUrlInput.value = proxyBaseUrl;
+    apiKeyInput.value = clientToken;
+        updateApiStatus('connected', 'Inicializando conexão com o proxy...');
 
-        function saveClientToken() {
+        // Tenta detectar automaticamente o proxy local (prioriza porta 3123, depois 3000 e 3100)
+        (async () => {
+            try {
+                const detected = await (async function detectProxyBaseUrl() {
+                    const bases = [
+                        `http://${defaultHost}:3123`,
+                        `http://${defaultHost}:3000`,
+                        `http://${defaultHost}:3100`
+                    ];
+                    for (const base of bases) {
+                        try {
+                            const r = await fetchWithTimeout(`${base.replace(/\/+$/, '')}/health`, {}, 2500);
+                            if (r.ok) return base;
+                        } catch (_) { /* tenta o próximo */ }
+                    }
+                    return bases[0];
+                })();
+                proxyBaseUrl = detected;
+                localStorage.setItem('boto_proxy_url', proxyBaseUrl);
+                apiUrlInput.value = proxyBaseUrl;
+                updateApiStatus('connected', `Conectado ao proxy em ${proxyBaseUrl}.`);
+            } catch (e) {
+                console.warn('Falha ao detectar proxy automaticamente:', e);
+                updateApiStatus('error', 'Não foi possível detectar o proxy automaticamente.');
+            }
+        })();
+
+        function saveApiSettings() {
+            const url = apiUrlInput.value.trim();
             const token = apiKeyInput.value.trim();
+            if (!/^https?:\/\//i.test(url)) {
+                updateApiStatus('error', 'URL do proxy inválida!');
+                playAnimation('error');
+                return;
+            }
             if (!token) {
                 updateApiStatus('error', 'Token inválido!');
                 playAnimation('error');
                 return;
             }
+
+            proxyBaseUrl = url;
             clientToken = token;
+            localStorage.setItem('boto_proxy_url', proxyBaseUrl);
             localStorage.setItem('boto_client_token', clientToken);
-            updateApiStatus('connected', 'Client token salvo localmente.');
+            updateApiStatus('connected', 'Configurações salvas.');
             playAnimation('success');
             // Clear and reset conversation
             conversationHistory = [];
@@ -861,65 +900,78 @@
         
         function removeTypingIndicator() {
             const typingDiv = document.getElementById('typingIndicator');
-            async function callProxy(userMessage) {
-                // Prefer proxy if available. The proxy expects Authorization: Bearer <token>
-                const proxyUrl = window.location.origin.replace(/:\d+$/, '') + ':3000/api/generate';
+            if (typingDiv && typingDiv.parentNode) {
+                typingDiv.parentNode.removeChild(typingDiv);
+            }
+        }
 
-                // Build conversation text (keeps system prompt + history)
-                let conversationText = `Você é o Boto, um assistente virtual amigável e inteligente em forma de boto cor-de-rosa. 
-    Você é carismático, prestativo e sempre tenta ajudar da melhor forma. 
-    Use emojis ocasionalmente (🐬💗✨) para tornar a conversa mais divertida.
-    Seja conciso mas informativo. Responda sempre em português do Brasil.\n\n`;
+        // Small helper to add a timeout to fetch (prevents endless loading)
+        async function fetchWithTimeout(resource, options = {}, timeoutMs = 15000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(resource, { ...options, signal: controller.signal });
+                return response;
+            } finally {
+                clearTimeout(id);
+            }
+        }
 
-                conversationHistory.forEach(msg => {
-                    conversationText += `${msg.role === 'user' ? 'Usuário' : 'Boto'}: ${msg.content}\n\n`;
-                });
+        // Use a persisted sessionId so the server can maintain context across turns
+        let sessionId = localStorage.getItem('boto_session_id') || '';
 
-                conversationText += `Usuário: ${userMessage}\n\nBoto:`;
-
-                conversationHistory.push({ role: 'user', content: userMessage });
-
-                // If clientToken exists, call proxy
-                if (clientToken) {
-                    try {
-                        const resp = await fetch(`${window.location.protocol}//${window.location.hostname}:3000/api/generate`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${clientToken}`
-                            },
-                            body: JSON.stringify({ message: conversationText })
-                        });
-
-                        if (!resp.ok) {
-                            const err = await resp.json().catch(() => ({}));
-                            console.error('Proxy Error:', err);
-                            if (resp.status === 401) {
-                                return 'Acesso negado ao proxy. Token inválido ou ausente. 🔒';
-                            }
-                            if (resp.status === 429) {
-                                return 'Limite do servidor atingido. Tente novamente mais tarde. ⏰';
-                            }
-                            return 'Erro no servidor. Tente novamente mais tarde. 😅';
-                        }
-
-                        const data = await resp.json();
-                        const assistantMessage = data.reply || 'Desculpe, resposta vazia do servidor.';
-
-                        conversationHistory.push({ role: 'assistant', content: assistantMessage });
-                        if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
-                        return assistantMessage;
-
-                    } catch (error) {
-                        console.error('Error calling proxy:', error);
-                        return 'Erro ao chamar o proxy. Verifique o token e se o servidor está rodando.';
-                    }
-                }
-
-                // If no client token, instruct user to configure it
+        // Call our project proxy (requires clientToken)
+        async function callProxy(userMessage) {
+            // If no client token, instruct user to set it
+            if (!clientToken) {
                 return 'Por favor, configure o token do cliente para usar o assistente do projeto.';
             }
+
+            // POST to configured proxy base URL
+            const url = `${proxyBaseUrl.replace(/\/+$/, '')}/api/generate`;
+
+            try {
+                const resp = await fetchWithTimeout(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${clientToken}`
+                    },
+                    // Send user's message and current sessionId so the server can maintain context
+                    body: JSON.stringify({ message: userMessage, sessionId })
+                }, 20000);
+
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    console.error('Proxy Error:', err);
+                    if (resp.status === 401) {
+                        return 'Acesso negado ao proxy. Token inválido ou ausente. 🔒';
+                    }
+                    if (resp.status === 429) {
+                        return 'Limite do servidor atingido. Tente novamente mais tarde. ⏰';
+                    }
+                    return 'Erro no servidor. Tente novamente mais tarde. 😅';
+                }
+
+                const data = await resp.json();
+                const assistantMessage = data.reply || 'Desculpe, resposta vazia do servidor.';
+                if (data.sessionId) {
+                    sessionId = data.sessionId;
+                    try { localStorage.setItem('boto_session_id', sessionId); } catch(_) {}
+                }
+
+                conversationHistory.push({ role: 'assistant', content: assistantMessage });
+                if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+                return assistantMessage;
+
+            } catch (error) {
+                console.error('Error calling proxy:', error);
+                if (error.name === 'AbortError') {
+                    return 'Tempo limite excedido ao chamar o servidor. Tente novamente. ⏳';
+                }
+                return 'Erro ao chamar o proxy. Verifique o token e se o servidor está rodando.';
             }
+        }
         
         
         async function sendMessage() {
@@ -945,7 +997,13 @@
             showTypingIndicator();
             
             // Call project proxy
-            const response = await callProxy(message);
+            let response;
+            try {
+                response = await callProxy(message);
+            } catch (e) {
+                console.error('Unexpected error:', e);
+                response = 'Ocorreu um erro inesperado.';
+            }
             
             // Remove typing indicator
             removeTypingIndicator();
@@ -964,6 +1022,26 @@
             if (event.key === 'Enter') {
                 sendMessage();
             }
+        }
+
+        // Optional: small reset helper to clear the session in the browser (server will recreate on next turn)
+        async function resetConversation() {
+            const old = sessionId;
+            sessionId = '';
+            try { localStorage.removeItem('boto_session_id'); } catch(_) {}
+            conversationHistory = [];
+            // Best-effort notify server to drop old session (safe to ignore errors)
+            try {
+                const url = `${proxyBaseUrl.replace(/\/+$/, '')}/api/reset`;
+                await fetchWithTimeout(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${clientToken}`
+                    },
+                    body: JSON.stringify({ sessionId: old })
+                }, 5000);
+            } catch(_) {}
         }
     </script>
 </body></html>
