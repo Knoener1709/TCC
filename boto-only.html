@@ -801,7 +801,8 @@
     // Se a página estiver aberta via file://, o hostname fica vazio; use 127.0.0.1
     const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
     const defaultHost = isHttp && window.location.hostname ? window.location.hostname : '127.0.0.1';
-    let proxyBaseUrl = localStorage.getItem('boto_proxy_url') || `http://${defaultHost}:3000`;
+    // Força usar porta 3123 como padrão (onde o servidor está configurado)
+    let proxyBaseUrl = localStorage.getItem('boto_proxy_url') || `http://${defaultHost}:3123`;
         let conversationHistory = [];
         
         // Load saved client token on startup
@@ -811,6 +812,8 @@
 
         // Tenta detectar automaticamente o proxy local (prioriza porta 3123, depois 3000 e 3100)
         (async () => {
+            console.log('[Boto Debug] Iniciando detecção de proxy...');
+            console.log('[Boto Debug] defaultHost:', defaultHost);
             try {
                 const detected = await (async function detectProxyBaseUrl() {
                     const bases = [
@@ -818,12 +821,21 @@
                         `http://${defaultHost}:3000`,
                         `http://${defaultHost}:3100`
                     ];
+                    console.log('[Boto Debug] Tentando portas:', bases);
                     for (const base of bases) {
                         try {
+                            console.log('[Boto Debug] Testando:', base + '/health');
                             const r = await fetchWithTimeout(`${base.replace(/\/+$/, '')}/health`, {}, 2500);
-                            if (r.ok) return base;
-                        } catch (_) { /* tenta o próximo */ }
+                            console.log('[Boto Debug] Resposta de', base, ':', r.status, r.ok);
+                            if (r.ok) {
+                                console.log('[Boto Debug] ✓ Proxy encontrado em:', base);
+                                return base;
+                            }
+                        } catch (e) { 
+                            console.log('[Boto Debug] ✗ Falha em', base, ':', e.message);
+                        }
                     }
+                    console.log('[Boto Debug] Nenhum proxy encontrado, usando padrão:', bases[0]);
                     return bases[0];
                 })();
                 proxyBaseUrl = detected;
@@ -831,7 +843,7 @@
                 apiUrlInput.value = proxyBaseUrl;
                 updateApiStatus('connected', `Conectado ao proxy em ${proxyBaseUrl}.`);
             } catch (e) {
-                console.warn('Falha ao detectar proxy automaticamente:', e);
+                console.error('[Boto Debug] Erro na detecção:', e);
                 updateApiStatus('error', 'Não foi possível detectar o proxy automaticamente.');
             }
         })();
@@ -929,6 +941,10 @@
 
             // POST to configured proxy base URL
             const url = `${proxyBaseUrl.replace(/\/+$/, '')}/api/generate`;
+            
+            console.log('[Boto Debug] Chamando proxy:', url);
+            console.log('[Boto Debug] Token:', clientToken.substring(0, 10) + '...');
+            console.log('[Boto Debug] SessionId:', sessionId || '(novo)');
 
             try {
                 const resp = await fetchWithTimeout(url, {
@@ -941,9 +957,11 @@
                     body: JSON.stringify({ message: userMessage, sessionId })
                 }, 20000);
 
+                console.log('[Boto Debug] Status resposta:', resp.status);
+
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    console.error('Proxy Error:', err);
+                    console.error('Proxy Error:', resp.status, err);
                     if (resp.status === 401) {
                         return 'Acesso negado ao proxy. Token inválido ou ausente. 🔒';
                     }
@@ -954,6 +972,7 @@
                 }
 
                 const data = await resp.json();
+                console.log('[Boto Debug] Resposta OK, sessionId:', data.sessionId);
                 const assistantMessage = data.reply || 'Desculpe, resposta vazia do servidor.';
                 if (data.sessionId) {
                     sessionId = data.sessionId;
@@ -965,11 +984,14 @@
                 return assistantMessage;
 
             } catch (error) {
-                console.error('Error calling proxy:', error);
+                console.error('[Boto Debug] Erro completo:', error);
                 if (error.name === 'AbortError') {
                     return 'Tempo limite excedido ao chamar o servidor. Tente novamente. ⏳';
                 }
-                return 'Erro ao chamar o proxy. Verifique o token e se o servidor está rodando.';
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    return `Não consegui conectar ao servidor em ${proxyBaseUrl}. Verifique se o servidor está rodando na porta 3123. 🔌`;
+                }
+                return `Erro ao chamar o proxy: ${error.message}. Verifique se o servidor está rodando.`;
             }
         }
         
