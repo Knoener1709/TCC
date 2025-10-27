@@ -15,13 +15,14 @@ app.use(express.json({ limit: '128kb' }));
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gpt-3.5-turbo';
+const WEBUI_URL = process.env.WEBUI_URL || '';
+const WEBUI_MODEL = process.env.WEBUI_MODEL || '';
+const SIMPLE_BOT = (process.env.SIMPLE_BOT || 'false').toLowerCase() === 'true';
 const APP_CLIENT_TOKEN = process.env.APP_CLIENT_TOKEN || 'dev-token-change-me';
 const MOCK_GEMINI = (process.env.MOCK_GEMINI || 'false').toLowerCase() === 'true';
 
-// Determine configured provider: mock, ollama, openai, or none
-const PROVIDER = MOCK_GEMINI ? 'mock' : (OLLAMA_URL ? 'ollama' : (OPENAI_API_KEY ? 'openai' : 'none'));
+// Determine configured provider: mock, webui, openai, or none
+const PROVIDER = MOCK_GEMINI ? 'mock' : (WEBUI_URL ? 'webui' : (OPENAI_API_KEY ? 'openai' : 'none'));
 
 // In-memory conversation sessions
 // Map<sessionId, Array<{role: 'system'|'user'|'assistant', content: string}>>
@@ -47,6 +48,27 @@ function getOrCreateSession(sessionId) {
     ]);
   }
   return { id: sid, messages: sessions.get(sid) };
+}
+
+// Very small rule-based bot for specific simple commands (fast, deterministic)
+function simpleBotRespond(message) {
+  if (!message || typeof message !== 'string') return null;
+  const m = message.trim().toLowerCase();
+  // greetings
+  if (/^\s*(oi|olá|ola|hello|eai)\b/.test(m)) return 'Oi! Eu sou o Boto 🐬 — posso responder coisas simples como hora, data, piada ou ajudar com comandos. Diga "ajuda" para ver opções.';
+  if (/\b(ajuda|help|comandos)\b/.test(m)) return 'Comandos disponíveis: "hora" (mostra hora atual), "data" (mostra data), "piada" (uma piada curta), "olá" (cumprimento). Por exemplo: "Que horas são?"';
+  if (/\b(hora|que horas|que horas são|horas)\b/.test(m)) {
+    const now = new Date();
+    return `Agora são ${now.toLocaleTimeString('pt-BR')}.`; 
+  }
+  if (/\b(data|que dia|qual a data|dia de hoje)\b/.test(m)) {
+    const now = new Date();
+    return `Hoje é ${now.toLocaleDateString('pt-BR')}.`;
+  }
+  if (/\b(piada|conte uma piada|piadas)\b/.test(m)) return 'Por que o programador sempre confunde Halloween com o Natal? Porque OCT 31 = DEC 25. 🎃🎄';
+  if (/\b(tchau|até|adeus)\b/.test(m)) return 'Tchau! Se precisar, chame-me novamente. 🐬';
+  // fallback short help
+  return null;
 }
 
 // Basic rate limiter per IP
@@ -104,56 +126,50 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
       return res.json({ reply: assistantMessage, sessionId: session.id });
     }
 
-    // Ollama support: prefer Ollama local server when configured
-    if (OLLAMA_URL) {
+    // SIMPLE_BOT mode: handle simple deterministic commands locally (fast)
+    if (SIMPLE_BOT) {
+      const simpleReply = simpleBotRespond(message);
+      if (simpleReply) {
+        // Save into session
+        session.messages.push({ role: 'user', content: message });
+        session.messages.push({ role: 'assistant', content: simpleReply });
+        if (session.messages.length > 1 + 20) {
+          const [system, ...rest] = session.messages;
+          session.messages = [system, ...rest.slice(-20)];
+        }
+        sessions.set(session.id, session.messages);
+        return res.json({ reply: simpleReply, sessionId: session.id });
+      }
+      // fallthrough to WEBUI or other providers if simple bot didn't match
+    }
+
+    // Local web UI support: prefer WEBUI when configured
+    if (WEBUI_URL) {
       try {
         // Append new user message to session history
         session.messages.push({ role: 'user', content: message });
-
-        // Build a simple prompt by concatenating messages (system, user, assistant ...)
-        const prompt = session.messages.map(m => {
-          const role = m.role === 'system' ? 'System' : (m.role === 'user' ? 'User' : 'Assistant');
-          return `${role}: ${m.content}`;
-        }).join('\n') + '\nAssistant:';
-
-        const url = OLLAMA_URL.replace(/\/$/, '') + '/api/generate';
+        let assistantMessage = '';
+        const webui = WEBUI_URL.replace(/\/$/, '');
+        const messages = session.messages.map(m => ({ role: m.role, content: m.content }));
         const body = {
-          model: OLLAMA_MODEL || undefined,
-          prompt: prompt,
+          model: WEBUI_MODEL || OPENAI_MODEL,
+          messages: messages,
           max_tokens: 512,
           temperature: 0.7
         };
-
-        const resp = await axios.post(url, body, { timeout: 30000 });
+        // text-generation-webui exposes an OpenAI-compatible endpoint at /v1/chat/completions
+        const resp = await axios.post(webui + '/v1/chat/completions', body, { timeout: 120000 });
         const data = resp.data;
-
-        // Try to be robust against different Ollama response shapes
-        let assistantMessage = '';
-        if (!data) {
-          return res.status(502).json({ error: 'Empty response from Ollama' });
-        }
-
-        // Common Ollama shapes: { results: [ { content: [ { type: 'output_text', text: '...' } ] } ] }
-        if (Array.isArray(data.results) && data.results.length > 0) {
-          const contents = data.results[0].content || [];
-          for (const c of contents) {
-            if (typeof c === 'string') assistantMessage += c;
-            else if (c?.type === 'output_text' && c?.text) assistantMessage += c.text;
-            else if (c?.text) assistantMessage += c.text;
-          }
-        } else if (typeof data === 'string') {
-          assistantMessage = data;
-        } else if (data.output && typeof data.output === 'string') {
-          assistantMessage = data.output;
-        } else if (data?.choices && data.choices[0]?.text) {
+        if (data?.choices && Array.isArray(data.choices) && data.choices[0]?.message?.content) {
+          assistantMessage = data.choices[0].message.content;
+        } else if (data?.choices && Array.isArray(data.choices) && data.choices[0]?.text) {
           assistantMessage = data.choices[0].text;
         } else {
-          // Fallback: stringify some of the payload (trim to reasonable length)
           assistantMessage = JSON.stringify(data).slice(0, 2000);
         }
 
         if (!assistantMessage) {
-          return res.status(502).json({ error: 'Empty parsed response from Ollama' });
+          return res.status(502).json({ error: 'Empty parsed response from provider' });
         }
 
         // Save assistant reply in session
@@ -167,15 +183,15 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
 
         return res.json({ reply: assistantMessage, sessionId: session.id });
       } catch (err) {
-        console.error('Ollama proxy error:', err?.response?.data || err.message || err);
+        console.error('Provider proxy error:', err?.response?.data || err.message || err);
         const status = err?.response?.status || 500;
-        const msg = err?.response?.data || { error: 'Upstream Ollama error' };
+        const msg = err?.response?.data || { error: 'Upstream provider error' };
         return res.status(status).json({ error: msg });
       }
     }
 
     // If we reach here and OpenAI isn't configured and mock isn't enabled, return a helpful error.
-    return res.status(500).json({ error: 'Server misconfigured: no LLM provider configured. Set OPENAI_API_KEY or enable MOCK_GEMINI for testing.' });
+  return res.status(500).json({ error: 'Server misconfigured: no LLM provider configured. Set OPENAI_API_KEY, WEBUI_URL or enable MOCK_GEMINI for testing.' });
 
   } catch (err) {
     console.error('Proxy error:', err?.response?.data || err.message || err);
@@ -197,8 +213,8 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 app.listen(PORT, HOST, () => {
   console.log(`Proxy listening on ${HOST}:${PORT} (pid=${process.pid})`);
-  console.log(`provider=${PROVIDER} | MOCK_GEMINI=${MOCK_GEMINI} | OLLAMA_URL=${OLLAMA_URL ? '[SET]' : '[NOT SET]'} | OLLAMA_MODEL=${OLLAMA_MODEL || '[NOT SET]'} | OPENAI_API_KEY=${OPENAI_API_KEY ? '[SET]' : '[NOT SET]'}`);
+  console.log(`provider=${PROVIDER} | MOCK_GEMINI=${MOCK_GEMINI} | WEBUI_URL=${WEBUI_URL ? '[SET]' : '[NOT SET]'} | WEBUI_MODEL=${WEBUI_MODEL || '[NOT SET]'} | OPENAI_API_KEY=${OPENAI_API_KEY ? '[SET]' : '[NOT SET]'}`);
   if (PROVIDER === 'none') {
-    console.warn('Warning: no LLM provider configured. Set OPENAI_API_KEY or enable MOCK_GEMINI for testing.');
+    console.warn('Warning: no LLM provider configured. Set OPENAI_API_KEY, WEBUI_URL or enable MOCK_GEMINI for testing.');
   }
 });

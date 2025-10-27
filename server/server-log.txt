@@ -1,0 +1,2 @@
+// Log cleared. Previous Ollama entries removed because Ollama is no longer used.
+// New runtime logs will be appended here when you run the proxy.
