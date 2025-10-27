@@ -15,12 +15,13 @@ app.use(express.json({ limit: '128kb' }));
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gpt-3.5-turbo';
 const APP_CLIENT_TOKEN = process.env.APP_CLIENT_TOKEN || 'dev-token-change-me';
 const MOCK_GEMINI = (process.env.MOCK_GEMINI || 'false').toLowerCase() === 'true';
 
-// Determine configured provider (mock or openai, or none)
-// NOTE: Gemini branch intentionally removed to avoid requiring/using Gemini keys anywhere.
-const PROVIDER = MOCK_GEMINI ? 'mock' : (OPENAI_API_KEY ? 'openai' : 'none');
+// Determine configured provider: mock, ollama, openai, or none
+const PROVIDER = MOCK_GEMINI ? 'mock' : (OLLAMA_URL ? 'ollama' : (OPENAI_API_KEY ? 'openai' : 'none'));
 
 // In-memory conversation sessions
 // Map<sessionId, Array<{role: 'system'|'user'|'assistant', content: string}>>
@@ -103,38 +104,56 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
       return res.json({ reply: assistantMessage, sessionId: session.id });
     }
 
-    // Prefer OpenAI if key is configured
-    if (OPENAI_API_KEY) {
+    // Ollama support: prefer Ollama local server when configured
+    if (OLLAMA_URL) {
       try {
         // Append new user message to session history
         session.messages.push({ role: 'user', content: message });
 
-        const resp = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: OPENAI_MODEL,
-            messages: session.messages,
-            temperature: 0.7,
-            max_tokens: 500
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${OPENAI_API_KEY}`
-            },
-            timeout: 30000
-          }
-        );
+        // Build a simple prompt by concatenating messages (system, user, assistant ...)
+        const prompt = session.messages.map(m => {
+          const role = m.role === 'system' ? 'System' : (m.role === 'user' ? 'User' : 'Assistant');
+          return `${role}: ${m.content}`;
+        }).join('\n') + '\nAssistant:';
 
-        const data = resp.data || {};
+        const url = OLLAMA_URL.replace(/\/$/, '') + '/api/generate';
+        const body = {
+          model: OLLAMA_MODEL || undefined,
+          prompt: prompt,
+          max_tokens: 512,
+          temperature: 0.7
+        };
+
+        const resp = await axios.post(url, body, { timeout: 30000 });
+        const data = resp.data;
+
+        // Try to be robust against different Ollama response shapes
         let assistantMessage = '';
-        if (data.choices && data.choices.length > 0) {
-          const choice = data.choices[0];
-          assistantMessage = choice.message?.content || choice.text || '';
+        if (!data) {
+          return res.status(502).json({ error: 'Empty response from Ollama' });
+        }
+
+        // Common Ollama shapes: { results: [ { content: [ { type: 'output_text', text: '...' } ] } ] }
+        if (Array.isArray(data.results) && data.results.length > 0) {
+          const contents = data.results[0].content || [];
+          for (const c of contents) {
+            if (typeof c === 'string') assistantMessage += c;
+            else if (c?.type === 'output_text' && c?.text) assistantMessage += c.text;
+            else if (c?.text) assistantMessage += c.text;
+          }
+        } else if (typeof data === 'string') {
+          assistantMessage = data;
+        } else if (data.output && typeof data.output === 'string') {
+          assistantMessage = data.output;
+        } else if (data?.choices && data.choices[0]?.text) {
+          assistantMessage = data.choices[0].text;
+        } else {
+          // Fallback: stringify some of the payload (trim to reasonable length)
+          assistantMessage = JSON.stringify(data).slice(0, 2000);
         }
 
         if (!assistantMessage) {
-          return res.status(502).json({ error: 'Empty response from OpenAI' });
+          return res.status(502).json({ error: 'Empty parsed response from Ollama' });
         }
 
         // Save assistant reply in session
@@ -148,9 +167,9 @@ app.post('/api/generate', requireClientToken, async (req, res) => {
 
         return res.json({ reply: assistantMessage, sessionId: session.id });
       } catch (err) {
-        console.error('OpenAI proxy error:', err?.response?.data || err.message || err);
+        console.error('Ollama proxy error:', err?.response?.data || err.message || err);
         const status = err?.response?.status || 500;
-        const msg = err?.response?.data || { error: 'Upstream OpenAI error' };
+        const msg = err?.response?.data || { error: 'Upstream Ollama error' };
         return res.status(status).json({ error: msg });
       }
     }
@@ -178,7 +197,7 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 app.listen(PORT, HOST, () => {
   console.log(`Proxy listening on ${HOST}:${PORT} (pid=${process.pid})`);
-  console.log(`provider=${PROVIDER} | MOCK_GEMINI=${MOCK_GEMINI} | OPENAI_API_KEY=${OPENAI_API_KEY ? '[SET]' : '[NOT SET]'}`);
+  console.log(`provider=${PROVIDER} | MOCK_GEMINI=${MOCK_GEMINI} | OLLAMA_URL=${OLLAMA_URL ? '[SET]' : '[NOT SET]'} | OLLAMA_MODEL=${OLLAMA_MODEL || '[NOT SET]'} | OPENAI_API_KEY=${OPENAI_API_KEY ? '[SET]' : '[NOT SET]'}`);
   if (PROVIDER === 'none') {
     console.warn('Warning: no LLM provider configured. Set OPENAI_API_KEY or enable MOCK_GEMINI for testing.');
   }

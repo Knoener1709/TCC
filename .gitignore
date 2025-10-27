@@ -30,3 +30,6 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Ignore local server environment files
+server/.env
